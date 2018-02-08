@@ -1,0 +1,107 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r load_packages}
+library(rtweet)
+library(dplyr)
+library(magrittr)
+library(tidyverse)
+library(tidytext)
+library(feather)
+source("~/Desktop/Szymon/iss-misc/twitter/Twitter-0/Twitter_token.R")
+```
+
+The idea is to take a sample of people and measure their complexity with different measures. Compare if they will socre on all scales or there will be people who score only on one or two.
+
+## Complexity of sources
+
+```{r sources}
+## Sample of 5000 CNN followers
+CNN_followers <- get_followers("CNN",
+                               n=5000,
+                               parse=TRUE)
+## Sample of 5000 Fox News followers
+FOX_followers <- get_followers("FoxNews",
+                               n=5000,
+                               parse=TRUE)
+
+## Lookup CNN followers profiles
+CNN_followers <- CNN_followers %$%
+  user_id %>%
+  lookup_users
+
+## Lookup Fox News followers profiles
+FOX_followers <- FOX_followers %$%
+  user_id %>%
+  lookup_users
+
+## Check if CNN followers follow Fox News
+CNN_following_FOX <- lookup_friendships(CNN_followers %$% screen_name, "FoxNews") %>%
+  filter(variable=="screen_name" | variable=="following")
+
+while (CNN_following_FOX %$% user %>% length < (4998*4)) {
+CNN_following_FOX <- lookup_friendships(CNN_followers %>% filter (!screen_name %in% (CNN_following_FOX %>% filter(variable=="screen_name" & relationship!="target") %$% value)) %$% screen_name, "FoxNews") %>%
+  filter(variable=="screen_name" | variable=="following") %>% bind_rows(CNN_following_FOX)
+}
+
+## Check if Fox News followers follow CNN
+FOX_following_CNN <- lookup_friendships(FOX_followers %$% screen_name, "CNN") %>%
+  filter(variable=="screen_name" | variable=="following")
+
+while (FOX_following_CNN %$% user %>% length < 4998*4) {
+FOX_following_CNN <- lookup_friendships(FOX_followers %>% filter (!screen_name %in% (CNN_following_FOX %>% filter(variable=="screen_name" & relationship!="target") %$% value)) %$% screen_name, "CNN") %>%
+  filter(variable=="screen_name" | variable=="following") %>% bind_rows(FOX_following_CNN)
+}
+
+write_feather(CNN_followers,"CNN_followers")
+write_feather(CNN_following_FOX,"CNN_following_FOX")
+write_feather(FOX_followers,"FOX_followers")
+write_feather(FOX_following_CNN,"FOX_following_CNN")
+
+
+
+## Get timelines of Fox News followers
+
+FOX_timelines <- read_feather("FOX_followers") %>%
+  filter(protected!=TRUE) %$%
+  screen_name %>%
+  as.vector() %>%
+  get_timelines(n=100, retryontimelimit=TRUE,parse=FALSE,file_name="FOX_timelines")
+
+FOX_timelines <- get_timelines(FOX_followers %>% filter(protected != TRUE) %$% screen_name %>% as.vector(), n=100)
+## Get timelines of CNN followers
+CNN_timelines <- get_timelines(CNN_followers %$% user_id %>% as.vector, n=1000)
+
+
+```
+
+## Emotional Complexity
+
+## Complexity within one category
+
+```{r category}
+simple_authors <- NULL ## simple authors
+
+complex_authors <- NULL ## complex authors
+  
+simple_authors <- get_timelines(complex_authors, n=100)
+
+complex_authors <- get_timelines(complex_authors, n=100)
+```
+
+## Complexity of locations
+
+```{r locations}
+FOX_followers_timelines <- get_timelines(FOX_followers %>% slice(1:30) %$% user_id,n=10)
+
+CNN_followers_timelines <- get_timelines(CNN_followers,n=100)
+
+```
+
+## Complexity of friends
+
+```{r}
+
+```
+
