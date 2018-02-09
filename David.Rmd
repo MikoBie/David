@@ -64,16 +64,15 @@ Sys.sleep(900)
 ## Get timelines of Fox News followers
 
 FOX_followers <- read_feather("FOX_followers")
-FOX_timeline_all <- NULL
+FOX_timeline_all <- data_frame(screen_name="")
 j <- 0
 for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   FOX_timeline <- get_timeline(i, n = 100)
-  rl <- rate_limit("statuses/user_timeline")
   FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
   if (FOX_timeline_all %$% screen_name %>% unique %>% length / 31 == FOX_timeline_all %$% screen_name %>% unique %>% length %/% 31) {
     print("Sleeping do not disturb!")
-    Sys.sleep(as.numeric(rl$reset, "secs"))
+    Sys.sleep(900)
   }
   print(j <- j+1)
 }
@@ -83,7 +82,7 @@ write_feather(FOX_timeline_all,"FOX_timelines_all")
 ## Get timelines of CNN followers
 
 CNN_followers <- read_feather("CNN_followers")
-CNN_timeline_all <- NULL
+CNN_timeline_all <- data_frame(screen_name="")
 j <- 0
 for (i in CNN_followers %>% filter(protected!=TRUE) %$% screen_name) {
   CNN_timeline <- get_timeline(i, n = 100)
