@@ -44,7 +44,7 @@ while (CNN_following_FOX %$% user %>% length < (4998*4)) {
 CNN_following_FOX <- lookup_friendships(CNN_followers %>% filter (!screen_name %in% (CNN_following_FOX %>% filter(variable=="screen_name" & relationship!="target") %$% value)) %$% screen_name, "FoxNews") %>%
   filter(variable=="screen_name" | variable=="following") %>% bind_rows(CNN_following_FOX)
 }
-
+Sys.sleep(900)
 ## Check if Fox News followers follow CNN
 FOX_following_CNN <- lookup_friendships(FOX_followers %$% screen_name, "CNN") %>%
   filter(variable=="screen_name" | variable=="following")
@@ -53,7 +53,7 @@ while (FOX_following_CNN %$% user %>% length < 4998*4) {
 FOX_following_CNN <- lookup_friendships(FOX_followers %>% filter (!screen_name %in% (CNN_following_FOX %>% filter(variable=="screen_name" & relationship!="target") %$% value)) %$% screen_name, "CNN") %>%
   filter(variable=="screen_name" | variable=="following") %>% bind_rows(FOX_following_CNN)
 }
-
+Sys.sleep(900)
 # write_feather(CNN_followers,"CNN_followers")
 # write_feather(CNN_following_FOX,"CNN_following_FOX")
 # write_feather(FOX_followers,"FOX_followers")
@@ -71,7 +71,8 @@ for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   rl <- rate_limit("statuses/user_timeline")
   FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
-  if (CNN_timeline_all %$% screen_name %>% length / 89 == CNN_timeline_all %$% screen_name %>% length %/% 89) {
+  if (FOX_timeline_all %$% screen_name %>% unique %>% length / 31 == FOX_timeline_all %$% screen_name %>% unique %>% length %/% 31) {
+    print("Sleeping do not disturb!")
     Sys.sleep(as.numeric(rl$reset, "secs"))
   }
   print(j <- j+1)
@@ -86,11 +87,12 @@ CNN_timeline_all <- NULL
 j <- 0
 for (i in CNN_followers %>% filter(protected!=TRUE) %$% screen_name) {
   CNN_timeline <- get_timeline(i, n = 100)
-  rl <- rate_limit("statuses/user_timeline")
   CNN_timeline_all <- bind_rows(CNN_timeline_all,CNN_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
-  if (CNN_timeline_all %$% screen_name %>% length / 89 == CNN_timeline_all %$% screen_name %>% length %/% 89) {
+  if (CNN_timeline_all %$% screen_name %>% unique %>% length / 31 == CNN_timeline_all %$% screen_name %>% unique %>% length %/% 31) {
+    print("Sleeping do not disturb!")
     Sys.sleep(900)
+    
   }
   print(j <- j+1)
 }
