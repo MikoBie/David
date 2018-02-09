@@ -9,7 +9,7 @@ library(magrittr)
 library(tidyverse)
 library(tidytext)
 library(feather)
-source("~/Desktop/Szymon/iss-misc/twitter/Twitter-0/Twitter_token.R")
+source("Twitter_token.R")
 ```
 
 The idea is to take a sample of people and measure their complexity with different measures. Compare if they will socre on all scales or there will be people who score only on one or two.
@@ -67,7 +67,7 @@ FOX_timelines <- read_feather("FOX_followers") %>%
   filter(protected!=TRUE) %$%
   screen_name %>%
   as.vector() %>%
-  get_timelines(n=100, retryontimelimit=TRUE,parse=FALSE,file_name="FOX_timelines")
+  get_timelines(n=100, check=FALSE, parse=FALSE)
 
 FOX_timelines <- get_timelines(FOX_followers %>% filter(protected != TRUE) %$% screen_name %>% as.vector(), n=100)
 ## Get timelines of CNN followers
