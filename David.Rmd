@@ -85,9 +85,9 @@ CNN_followers <- read_feather("CNN_followers")
 CNN_timeline_all <- NULL
 j <- 0
 for (i in CNN_followers %$% screen_name) {
-  FOX_timeline <- get_timeline(i, n = 100)
+  CNN_timeline <- get_timeline(i, n = 100)
   rl <- rate_limit("statuses/user_timeline")
-  FOX_timeline_all <- bind_rows(CNN_timeline_all,CNN_timeline)
+  CNN_timeline_all <- bind_rows(CNN_timeline_all,CNN_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
   if (rl$remaining == 0L) {
     Sys.sleep(as.numeric(rl$reset, "secs"))
