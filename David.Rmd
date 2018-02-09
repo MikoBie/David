@@ -62,13 +62,18 @@ write_feather(FOX_following_CNN,"FOX_following_CNN")
 
 
 ## Get timelines of Fox News followers
-
+page=-1
+FOX_timelines_all <- NULL
+while (FOX_timelines %$% screen_name %>% unique < 4812) {
 FOX_timelines <- read_feather("FOX_followers") %>%
   filter(protected!=TRUE) %$%
   screen_name %>%
   as.vector() %>%
-  get_timelines(n=100, check=FALSE, parse=FALSE)
-
+  get_timelines(n=100, check=FALSE, retryontimeratelimit=TRUE, page=page)
+page <- next_cursor(FOX_timelines)
+FOX_timelines_all <- bind_rows(FOX_timelines_all,FOX_timelines)
+Sys.sleep(60*15)
+}
 FOX_timelines <- get_timelines(FOX_followers %>% filter(protected != TRUE) %$% screen_name %>% as.vector(), n=100)
 ## Get timelines of CNN followers
 CNN_timelines <- get_timelines(CNN_followers %$% user_id %>% as.vector, n=1000)
