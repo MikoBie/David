@@ -69,8 +69,8 @@ j <- 0
 for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   FOX_timeline <- get_timeline(i, n = 100)
   FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timeline)
-  ## if rate limit exhausted, then wait to rate limit reset
-  if (FOX_timeline_all %$% screen_name %>% unique %>% length / 31 == FOX_timeline_all %$% screen_name %>% unique %>% length %/% 31) {
+  ## I set it to 175 even though the limit for application connection is 180, but it is just safer to set as lower.
+  if (j / 175 == j %/% 175) {
     print("Sleeping do not disturb!")
     Sys.sleep(900)
   }
@@ -88,7 +88,7 @@ for (i in CNN_followers %>% filter(protected!=TRUE) %$% screen_name) {
   CNN_timeline <- get_timeline(i, n = 100)
   CNN_timeline_all <- bind_rows(CNN_timeline_all,CNN_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
-  if (CNN_timeline_all %$% screen_name %>% unique %>% length / 31 == CNN_timeline_all %$% screen_name %>% unique %>% length %/% 31) {
+  if (j / 175 == j %/% 175) {
     print("Sleeping do not disturb!")
     Sys.sleep(900)
     
