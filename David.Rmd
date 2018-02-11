@@ -14,72 +14,99 @@ source("Twitter_token.R")
 
 The idea is to take a sample of people and measure their complexity with different measures. Compare if they will socre on all scales or there will be people who score only on one or two.
 
-## Complexity of sources
+## Getting tweets
+
+The idea is to validate hypothesis that people who follow only either CNN or FOX are less complex the ones who follow both sources. First thing first. Download some tweets.
 
 ```{r sources}
-## Sample of 5000 CNN followers
+## Sample of 75000 CNN followers, it's maximum, however there is retryonratelimit argument
 CNN_followers <- get_followers("CNN",
-                               n=5000,
-                               parse=TRUE)
-## Sample of 5000 Fox News followers
-FOX_followers <- get_followers("FoxNews",
-                               n=5000,
-                               parse=TRUE)
+                               n=75000,
+                               parse=TRUE,
+                               retryonratelimit = TRUE)
 
-## Lookup CNN followers profiles
+print("Sleeping after CNN followers. Do not wake up!")
+Sys.sleep(900)
+
+## Sample of 75000 Fox News followers, it's maximum, however there is retryonratelimit argument
+FOX_followers <- get_followers("FoxNews",
+                               n=75000,
+                               parse=TRUE,
+                               retryonratelimit = TRUE)
+
+print("Sleeping after FOX followers. Do not wake up!")
+Sys.sleep(900)
+
+## Lookup CNN followers profiles. Maximum is 90000 per 15 minutes
 CNN_followers <- CNN_followers %$%
   user_id %>%
-  lookup_users
+  lookup_users()
+write_feather(CNN_followers,"CNN_followers")
+print("Sleeping after CNN followers. Do not wake up!")
+Sys.sleep(900)
 
-## Lookup Fox News followers profiles
+## Lookup Fox News followers profiles. Maximum is 90000 per 15 minutes
 FOX_followers <- FOX_followers %$%
   user_id %>%
   lookup_users
-
-## Check if CNN followers follow Fox News
-CNN_following_FOX <- lookup_friendships(CNN_followers %$% screen_name, "FoxNews") %>%
-  filter(variable=="screen_name" | variable=="following")
-
-while (CNN_following_FOX %$% user %>% length < (4998*4)) {
-CNN_following_FOX <- lookup_friendships(CNN_followers %>% filter (!screen_name %in% (CNN_following_FOX %>% filter(variable=="screen_name" & relationship!="target") %$% value)) %$% screen_name, "FoxNews") %>%
-  filter(variable=="screen_name" | variable=="following") %>% bind_rows(CNN_following_FOX)
-}
+write_feather(FOX_followers,"FOX_followers")
+print("Sleeping after FOX followers. Do not wake up!")
 Sys.sleep(900)
-## Check if Fox News followers follow CNN
-FOX_following_CNN <- lookup_friendships(FOX_followers %$% screen_name, "CNN") %>%
+
+## Check if CNN followers follow Fox News. The lookup friendship limit is exactly the same as app limit, so therefore I am just looking one by one. It is acctualy 180 but better safe than sorry.
+CNN_following_FOX_all <- NULL
+j <- 0
+for (i in CNN_followers %$% screen_name){
+  CNN_following_FOX <- lookup_friendships(i, "FoxNews") %>%
   filter(variable=="screen_name" | variable=="following")
-
-while (FOX_following_CNN %$% user %>% length < 4998*4) {
-FOX_following_CNN <- lookup_friendships(FOX_followers %>% filter (!screen_name %in% (CNN_following_FOX %>% filter(variable=="screen_name" & relationship!="target") %$% value)) %$% screen_name, "CNN") %>%
-  filter(variable=="screen_name" | variable=="following") %>% bind_rows(FOX_following_CNN)
+  CNN_following_FOX_all <- bind_rows(CNN_following_FOX_all,CNN_following_FOX)
+  j <- j+1
+  if (j/179 == j%/%179) {
+    print("Sleeping during CNN following FOX. Do not wake up!")
+    Sys.sleep(900)
+  }
 }
+write_feather(CNN_following_FOX_all,"CNN_following_FOX_all")
+print("Sleeping after CNN following FOX. Do not wake up!")
 Sys.sleep(900)
-# write_feather(CNN_followers,"CNN_followers")
-# write_feather(CNN_following_FOX,"CNN_following_FOX")
-# write_feather(FOX_followers,"FOX_followers")
-# write_feather(FOX_following_CNN,"FOX_following_CNN")
 
+## Check if FOX followers follow CNN. The lookup friendship limit is exactly the same as app limit, so therefore I am just looking one by one. It is acctualy 180 but better safe than sorry.
+FOX_following_CNN_all <- NULL
+j <- 0
+for (i in FOX_followers %$% screen_name){
+  FOX_following_CNN <- lookup_friendships(i, "CNN") %>%
+  filter(variable=="screen_name" | variable=="following")
+  FOX_following_CNN_all <- bind_rows(FOX_following_CNN_all,FOX_following_CNN)
+  j <- j+1
+  if (j/179 == j%/%179) {
+    print("Sleeping during FOX following CNN. Do not wake up!")
+    Sys.sleep(900)
+  }
+}
+write_feather(FOX_following_CNN_all,"FOX_following_CNN_all")
+print("Sleeping after FOX following CNN. Do not wake up!")
+Sys.sleep(900)
 
-
-## Get timelines of Fox News followers
+## Get timelines of Fox News followers. The limit is acctually 180 but better safe than sorry. It is so because it is app limit not timelines. In other words app can connect to Twitter only 180 times within 15 minutes
 
 FOX_followers <- read_feather("FOX_followers")
 FOX_timeline_all <- data_frame(screen_name="")
 j <- 0
 for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   FOX_timeline <- get_timeline(i, n = 100)
-  FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timeline)
-  ## I set it to 175 even though the limit for application connection is 180, but it is just safer to set as lower.
-  if (j / 175 == j %/% 175) {
-    print("Sleeping do not disturb!")
+  FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timline)
+  ## if rate limit exhausted, then wait to rate limit reset
+  if (j / 179 == j %/% 179) {
+    print("Sleeping, during FOX timelines. Do not disturb!")
     Sys.sleep(900)
   }
   print(j <- j+1)
 }
+write_feather(FOX_timeline_all %>% select(-hashtags) ,"FOX_timelines_all")
+print("Sleeping after FOX timeline. Do not disturb!")
+Sys.sleep(900)
 
-write_feather(FOX_timeline_all,"FOX_timelines_all")
-
-## Get timelines of CNN followers
+## Get timelines of CNN followers. The limit is acctually 180 but better safe than sorry. It is so because it is app limit not timelines. In other words app can connect to Twitter only 180 times within 15 minutes
 
 CNN_followers <- read_feather("CNN_followers")
 CNN_timeline_all <- data_frame(screen_name="")
@@ -88,20 +115,56 @@ for (i in CNN_followers %>% filter(protected!=TRUE) %$% screen_name) {
   CNN_timeline <- get_timeline(i, n = 100)
   CNN_timeline_all <- bind_rows(CNN_timeline_all,CNN_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
-  if (j / 175 == j %/% 175) {
-    print("Sleeping do not disturb!")
+  if (j / 179 == j %/% 179) {
+    print("Sleeping, during CNN timelines. Do not disturb!")
     Sys.sleep(900)
-    
   }
   print(j <- j+1)
 }
 
-write_feather(CNN_timeline_all,"CNN_timelines_all")
-
+write_feather(CNN_timeline_all %>% select(-hashtags),"CNN_timelines_all")
+print("Sleeping after CNN timeline. Do not disturb!")
+Sys.sleep(900)
 
 
 
 ```
+
+```{r group_users}
+
+FOX_following_CNN_TRUE <- FOX_following_CNN_all %>%
+  filter(relationship=="target") %>%
+  filter(value==TRUE) %$%
+  user
+FOX_following_CNN_FALSE <- FOX_following_CNN_all %>%
+  filter(relationship=="target") %>%
+  filter(value==FALSE) %$%
+  user
+
+CNN_following_FOX_TRUE <- CNN_following_FOX_all %>%
+  filter(relationship=="target") %>%
+  filter(value==TRUE) %$%
+  user
+CNN_following_FOX_FALSE <- CNN_following_FOX_all %>%
+  filter(relationship=="target") %>%
+  filter(value==FALSE) %$%
+  user
+
+single_source <- FOX_timeline_all %>%
+  filter(screen_name %in% FOX_following_CNN_FALSE) %>%
+  mutate(following="FOX") %>%
+  bind_rows(CNN_timeline_all %>% filter(screen_name %in% CNN_following_FOX_FALSE) %>% mutate(following="CNN"))
+
+double_source <- FOX_timeline_all %>%
+  filter(screen_name %in% FOX_following_CNN_TRUE) %>%
+  mutate(following="FOX") %>%
+  bind_rows(CNN_timeline_all %>% filter(screen_name %in% CNN_following_FOX_TRUE) %>% mutate(following="CNN")) %>%
+  unique()
+```
+
+## Complexity of sources
+
+
 
 ## Emotional Complexity
 
