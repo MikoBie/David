@@ -19,18 +19,18 @@ The idea is to take a sample of people and measure their complexity with differe
 The idea is to validate hypothesis that people who follow only either CNN or FOX are less complex the ones who follow both sources. First thing first. Download some tweets.
 
 ```{r sources}
-## Sample of 75000 CNN followers, it's maximum, however there is retryonratelimit argument
+## Sample of 15000 CNN followers, it's maximum, however there is retryonratelimit argument
 CNN_followers <- get_followers("CNN",
-                               n=75000,
+                               n=15000,
                                parse=TRUE,
                                retryonratelimit = TRUE)
 
 print("Sleeping after CNN followers. Do not wake up!")
 Sys.sleep(900)
 
-## Sample of 75000 Fox News followers, it's maximum, however there is retryonratelimit argument
+## Sample of 15000 Fox News followers, it's maximum, however there is retryonratelimit argument
 FOX_followers <- get_followers("FoxNews",
-                               n=75000,
+                               n=15000,
                                parse=TRUE,
                                retryonratelimit = TRUE)
 
@@ -60,7 +60,7 @@ for (i in CNN_followers %$% screen_name){
   CNN_following_FOX <- lookup_friendships(i, "FoxNews") %>%
   filter(variable=="screen_name" | variable=="following")
   CNN_following_FOX_all <- bind_rows(CNN_following_FOX_all,CNN_following_FOX)
-  j <- j+1
+  print(j <- j+1)
   if (j/179 == j%/%179) {
     print("Sleeping during CNN following FOX. Do not wake up!")
     Sys.sleep(900)
@@ -77,7 +77,7 @@ for (i in FOX_followers %$% screen_name){
   FOX_following_CNN <- lookup_friendships(i, "CNN") %>%
   filter(variable=="screen_name" | variable=="following")
   FOX_following_CNN_all <- bind_rows(FOX_following_CNN_all,FOX_following_CNN)
-  j <- j+1
+  print(j <- j+1)
   if (j/179 == j%/%179) {
     print("Sleeping during FOX following CNN. Do not wake up!")
     Sys.sleep(900)
@@ -103,6 +103,7 @@ for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   print(j <- j+1)
 }
 write_feather(FOX_timeline_all %>% select(-hashtags) ,"FOX_timelines_all")
+write_as_csv(FOX_timeline_all,"FOX_timelines_all.csv")
 print("Sleeping after FOX timeline. Do not disturb!")
 Sys.sleep(900)
 
@@ -123,11 +124,9 @@ for (i in CNN_followers %>% filter(protected!=TRUE) %$% screen_name) {
 }
 
 write_feather(CNN_timeline_all %>% select(-hashtags),"CNN_timelines_all")
+write_as_csv(CNN_timeline_all,"CNN_timeline_all.csv")
 print("Sleeping after CNN timeline. Do not disturb!")
 Sys.sleep(900)
-
-
-
 ```
 
 ```{r group_users}
