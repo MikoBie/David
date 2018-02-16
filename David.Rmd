@@ -89,12 +89,12 @@ Sys.sleep(900)
 
 ## Get timelines of Fox News followers. The limit is acctually 180 but better safe than sorry. It is so because it is app limit not timelines. In other words app can connect to Twitter only 180 times within 15 minutes
 
-FOX_followers <- read_feather("FOX_followers")
+FOX_followers <- read_feather("FOX_followers") %>% slice(1:7500)
 FOX_timeline_all <- data_frame(screen_name="")
 j <- 0
 for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   FOX_timeline <- get_timeline(i, n = 100)
-  FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timline)
+  FOX_timeline_all <- bind_rows(FOX_timeline_all,FOX_timeline)
   ## if rate limit exhausted, then wait to rate limit reset
   if (j / 179 == j %/% 179) {
     print("Sleeping, during FOX timelines. Do not disturb!")
@@ -102,8 +102,15 @@ for (i in FOX_followers %>% filter(protected!=TRUE) %$% screen_name) {
   }
   print(j <- j+1)
 }
-write_feather(FOX_timeline_all %>% select(-hashtags) ,"FOX_timelines_all")
-write_as_csv(FOX_timeline_all,"FOX_timelines_all.csv")
+write_as_csv(FOX_timeline_all,"FOX_timelines_all.csv_1")
+write_feather(FOX_timeline_all %>% select(-hashtags) ,"FOX_timelines_all_1")
+
+FOX_timeline_all <- read_twitter_csv("FOX_timelines_all.csv_1") %>%
+  bind_rows(read_twitter_csv("FOX_timelines_all.csv_2"))
+
+FOX_timeline_all %>%
+  write_as_csv("FOX_timeline_all.csv")
+
 print("Sleeping after FOX timeline. Do not disturb!")
 Sys.sleep(900)
 
@@ -130,40 +137,55 @@ Sys.sleep(900)
 ```
 
 ```{r group_users}
-
-FOX_following_CNN_TRUE <- FOX_following_CNN_all %>%
+FOX_following_CNN_TRUE <- read_feather("Data/FOX_following_CNN_all") %>%
   filter(relationship=="target") %>%
   filter(value==TRUE) %$%
   user
-FOX_following_CNN_FALSE <- FOX_following_CNN_all %>%
+
+FOX_following_CNN_FALSE <- read_feather("Data/FOX_following_CNN_all") %>%
   filter(relationship=="target") %>%
   filter(value==FALSE) %$%
   user
 
-CNN_following_FOX_TRUE <- CNN_following_FOX_all %>%
+CNN_following_FOX_TRUE <- read_feather("Data/CNN_following_FOX_all") %>%
   filter(relationship=="target") %>%
   filter(value==TRUE) %$%
   user
-CNN_following_FOX_FALSE <- CNN_following_FOX_all %>%
+CNN_following_FOX_FALSE <- read_feather("Data/CNN_following_FOX_all") %>%
   filter(relationship=="target") %>%
   filter(value==FALSE) %$%
   user
 
-single_source <- FOX_timeline_all %>%
+single_source <- read_twitter_csv("Data/FOX_timeline_all.csv") %>%
   filter(screen_name %in% FOX_following_CNN_FALSE) %>%
   mutate(following="FOX") %>%
-  bind_rows(CNN_timeline_all %>% filter(screen_name %in% CNN_following_FOX_FALSE) %>% mutate(following="CNN"))
+  bind_rows(read_twitter_csv("Data/CNN_timeline_all.csv") %>% filter(screen_name %in% CNN_following_FOX_FALSE) %>% mutate(following="CNN")) %>%
+  write_feather("Data/single_source")
 
-double_source <- FOX_timeline_all %>%
+double_source <- read_twitter_csv("Data/FOX_timeline_all.csv") %>%
   filter(screen_name %in% FOX_following_CNN_TRUE) %>%
   mutate(following="FOX") %>%
-  bind_rows(CNN_timeline_all %>% filter(screen_name %in% CNN_following_FOX_TRUE) %>% mutate(following="CNN")) %>%
-  unique()
+  bind_rows(read_twitter_csv("Data/CNN_timeline_all.csv") %>% filter(screen_name %in% CNN_following_FOX_TRUE) %>% mutate(following="CNN")) %>%
+  unique() %>%
+  write_feather("Data/double_source")
+```
+
+## Transform data set
+
+Here we encounter a small problem. The emojis. I still did not figure out a good way of dealing with them. because we have a big data set here I would just get rid of them. The other concern is that we have followers who not necessarly are tweeting in English. For now I will get rid off them but a question maintans what to do with them. Transformation below are the same as we did in class, but might take a little while cause the data set is much bigger.
+
+```{r transform_data}
+single_source
 ```
 
 ## Complexity of sources
 
+I would start with something fairly easy. It means with tf-idf
 
+```{r complexity_sources}
+
+
+```
 
 ## Emotional Complexity
 
