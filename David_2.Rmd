@@ -1,0 +1,109 @@
+---
+title: ""
+output: html_notebook
+---
+```{r load_packages}
+library(rtweet)
+library(dplyr)
+library(magrittr)
+library(tidyverse)
+library(tidytext)
+library(feather)
+source("clean_twitter_data.R")
+source("Twitter_token.R")
+```
+
+
+```{r getting_tweets}
+accounts <- data_frame(screen_name=c("Google", "Tesla", "Microsoft", "intel", "Sony","MuseumModernArt", "Tate", "Guggenheim", "metmuseum", "whitneymuseum","ESPNFC", "FOXSports", "CBSSports", "BBCSport", "beINSPORTS","NatGeo","ScienceNews","sciam","NASA","PhysicsToday","CNNPolitics","WhiteHouse","StateDept","foxnewspolitics","politico","Pontifex","DalaiLama","TheRaDR","RickWarren","Imamofpeace","ELLEmagazine","gq","hellomag","MensHealthMag","O_Magazine"), category=c(rep("Tech",5),rep("Art",5),rep("Sport",5),rep("Science",5),rep("Politics",5),rep("Religion",5),rep("Social",5)))
+
+timelines <- get_timelines(accounts %$% screen_name, n=100)
+```
+
+
+
+```{r clean_data}
+timelines <- timelines %>%
+  clean_twitter_data()
+```
+
+```{r key}
+timelines <- timelines %>%
+  left_join(accounts)
+```
+
+```{r transform_data_for_dictionary}
+timelines_words <- timelines %>%
+  unnest_tokens(input=text,
+                output=word) %>%
+  count(category,word,sort=TRUE) %>%
+  ungroup() %>%
+  group_by(category) %>%
+  summarise(total=sum(n))
+
+timelines_count <- timelines %>%
+  unnest_tokens(input=text,
+                output=word) %>%
+  count(category,word,sort=TRUE) %>%
+  ungroup() %>%
+  left_join(timelines_words)
+```
+
+```{r create_dictionary}
+
+timelines_tf_idf <- timelines_count %>%
+  bind_tf_idf(word, category, n)
+
+timelines_dicitionary <- timelines_tf_idf %>%
+  filter(idf==max(idf)) %>%
+  select(category, word)
+
+```
+
+```{r sample_tweets}
+sample <- stream_tweets(timeout = 60*5,
+                        language = "en")
+```
+```{r clean_sample}
+sample <- sample %>%
+  clean_twitter_data() %>%
+  unnest_tokens(input=text,
+                output=word)
+
+sample_wordcunts <- sample %>%
+  group_by(status_id) %>%
+  summarise(words=n())
+
+sample %>%
+  inner_join(timelines_dicitionary) %>%
+  group_by(status_id,category) %>%
+  summarise(category_words=n()) %>%
+  left_join(sample_wordcunts) %>%
+  mutate(category_ratio=category_words/words) %>%
+  left_join(sample %>% select(-word)) %>%
+  unique %>%
+  group_by(status_id) %>%
+  summarise(number_categroies=n()) %>%
+  ungroup %>%
+  ggplot(aes(number_categroies)) +
+  geom_histogram()
+
+
+```
+
+
+```{r aggregate}
+sample %>%
+  group_by(status_id,category) %>%
+  ## Compute words loading specific category of sentiment within tweet
+  summarize(sentiment_words = n()) %>%
+  ## Add word count of all words from the tweet
+  left_join() %>%
+  ## Compute ratio of each category fos entiment to all words in a tweet
+  mutate(ratio = sentiment_words/words) %>%
+  ## Add columns like created_at, favorite_count, retweet_count, and hashtags
+  left_join(FACup %>% select(-word)) %>%
+  ## Remove repeating words
+  unique()
+
+```
