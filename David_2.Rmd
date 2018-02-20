@@ -13,81 +13,129 @@ source("clean_twitter_data.R")
 source("Twitter_token.R")
 ```
 
+First, I download some tweets. To do so I created a data frame with names of the accounts from which we want to get accounts, and category they fall into. Afterwards I just use our old friends `get_timelines()` and `write_as_csv()` to get the timelines and save them as csv.
 
 ```{r getting_tweets}
+## I create a data frame with data_frame(). I set column name just by writing it as an argument. Each column is defined as a character vector. The function rep() repeats given object number of times.
 accounts <- data_frame(screen_name=c("Google", "Tesla", "Microsoft", "intel", "Sony","MuseumModernArt", "Tate", "Guggenheim", "metmuseum", "whitneymuseum","ESPNFC", "FOXSports", "CBSSports", "BBCSport", "beINSPORTS","NatGeo","ScienceNews","sciam","NASA","PhysicsToday","CNNPolitics","WhiteHouse","StateDept","foxnewspolitics","politico","Pontifex","DalaiLama","TheRaDR","RickWarren","Imamofpeace","ELLEmagazine","gq","hellomag","MensHealthMag","O_Magazine"), category=c(rep("Tech",5),rep("Art",5),rep("Sport",5),rep("Science",5),rep("Politics",5),rep("Religion",5),rep("Social",5)))
 
-timelines <- get_timelines(accounts %$% screen_name, n=100)
+## Getting timelines. I don't quite get it why it was not limited because it should have been. I mean apparently the code below works, it takes a while but works.
+timelines <- get_timelines(accounts %$% screen_name, n=1000)
+## Saving results as csv.
+write_as_csv(timelines,"timelines.csv")
 ```
 
-
+Cleaning data from links and emojis. We do not need emojis, however if we had category like movies or entertainment we could have needed them. The problem with the way I dealt with them is that it is not very efficient, I still did not figure out how to do it better. Nevertheless I deleted translation of emojis from the code because with bigger samples it takes to much time and is kind of pointless since it does not translate all of them.
 
 ```{r clean_data}
-timelines <- timelines %>%
-  clean_twitter_data()
-```
-
-```{r key}
-timelines <- timelines %>%
+## Read data from data frame
+timelines <- read_twitter_csv("Data/timelines.csv") %>%
+  ## Cleaning data from links and emojis
+  clean_twitter_data() %>%
+  ## Adding column with categories
   left_join(accounts)
 ```
 
+The process of creating dictionary is almost the same as we did in class. The only difference is that now I group by categories instead of screen_names.
+
 ```{r transform_data_for_dictionary}
+## Compute total number of words in each category
 timelines_words <- timelines %>%
+  ## Change from wide format to long. Now word is a record
   unnest_tokens(input=text,
                 output=word) %>%
+  ## Count words in each category
   count(category,word,sort=TRUE) %>%
+  ## Unroup because the previous function by defualt leaves the data set grouped
   ungroup() %>%
+  ## Group by categories
   group_by(category) %>%
+  ## Count words in each category
   summarise(total=sum(n))
 
+## Add total number of words to word frequency
 timelines_count <- timelines %>%
+  ## Change from wide format to long. Now word is a record
   unnest_tokens(input=text,
                 output=word) %>%
+  ## Count words frequency in each category
   count(category,word,sort=TRUE) %>%
+  ## Ungroup
   ungroup() %>%
+  ## Join total number of words
   left_join(timelines_words)
 ```
 
-```{r create_dictionary}
+Creating dictionary is fairly easy because likewise in the class I just computed tf-idf and afterwards selected words with the highest idf. However, I started thinking now about the dictionary we created. So there are words which fall into more than one category. Maybe it would be interesting to check if people who use words which are having in that sense double meaning also are not more complex? 
 
+```{r create_dictionary}
+## Compute tf-idf
 timelines_tf_idf <- timelines_count %>%
   bind_tf_idf(word, category, n)
-
+## Make the dictioanry
 timelines_dicitionary <- timelines_tf_idf %>%
+  ## Filter only terms which appear in one of the dictionaries
   filter(idf==max(idf)) %>%
+  ## Select only two categories
   select(category, word)
 
 ```
 
+The next step is of course to check how the dictionary works in practice. I downloaded random sample of tweets in theory in English and saved them just in case.
+
 ```{r sample_tweets}
-sample <- stream_tweets(timeout = 60*5,
+## Download randome sample tweets in English for 10 minutes.
+sample <- stream_tweets(timeout = 60*10,
                         language = "en")
+## Save the sample as csv file
+write_as_csv(sample,"Data/sample.csv")
 ```
+
+The procedure of cleaning the data set is exactly the same as always. Afterwards I use the dictionary and aggregate results by tweets.
+
 ```{r clean_sample}
-sample <- sample %>%
+## Read the data set from the csv file
+sample <- read_twitter_csv("Data/sample.csv") %>%
+  ## Clean the data from links and emojis
   clean_twitter_data() %>%
+  ## Change from wide format to long. Now word is a record
   unnest_tokens(input=text,
                 output=word)
-
+## Compute total number of wrods in each tweet
 sample_wordcunts <- sample %>%
+  ## Group by tweet
   group_by(status_id) %>%
+  ## Compute number of words in tweet
   summarise(words=n())
 
-sample %>%
+## Aggregate categories used in each tweet
+sample_categorised <- sample %>%
+  ## Compute the categories
   inner_join(timelines_dicitionary) %>%
+  ## Group by tweet and category
   group_by(status_id,category) %>%
+  ## Compute number of words in each category in each tweet
   summarise(category_words=n()) %>%
+  ## Join with total number of words in each tweet
   left_join(sample_wordcunts) %>%
+  ## Compute the proportion of category loading words in each tweet
   mutate(category_ratio=category_words/words) %>%
+  ## Join with properties of tweet
   left_join(sample %>% select(-word)) %>%
-  unique %>%
+  ## Get read of repeating rows
+  unique 
+
+## Get the histogram
+sample_categorised %>%
+  ## Group by tweet
   group_by(status_id) %>%
+  ## Compute frequency of tweets
   summarise(number_categroies=n()) %>%
+  ## Ungroup. otherwise we would get thousands of histograms, I think
   ungroup %>%
+  ## Plot the histogram
   ggplot(aes(number_categroies)) +
   geom_histogram()
-
 
 ```
 
