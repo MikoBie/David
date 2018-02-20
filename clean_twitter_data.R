@@ -5,7 +5,6 @@ library(dplyr)
 library(magrittr)
 library(tidytext) 
 library(stringr)
-library(DataCombine)
 library(reshape2)
 library(tidyr)
 
