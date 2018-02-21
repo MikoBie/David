@@ -9,7 +9,7 @@ library(magrittr)
 library(tidyverse)
 library(tidytext)
 library(feather)
-source("Twitter_token.R")
+#source("Twitter_token.R")
 ```
 
 The idea is to take a sample of people and measure their complexity with different measures. Compare if they will socre on all scales or there will be people who score only on one or two.
@@ -175,7 +175,16 @@ double_source <- read_twitter_csv("Data/FOX_timeline_all.csv") %>%
 Here we encounter a small problem. The emojis. I still did not figure out a good way of dealing with them. because we have a big data set here I would just get rid of them. The other concern is that we have followers who not necessarly are tweeting in English. For now I will get rid off them but a question maintans what to do with them. Transformation below are the same as we did in class, but might take a little while cause the data set is much bigger.
 
 ```{r transform_data}
-single_source
+data(stop_words)
+
+single_source <- read_feather("Data/single_source_sample") %>%
+  mutate(text=iconv(text,from="latin1",to="ascii",sub="byte")) %>%
+  mutate(text=str_replace_all(string=text,
+                              replacement="",
+                              pattern="(<[:alnum:]{2}>)")) %>%
+  mutate(text=str_replace_all(string=text,
+                              pattern="http[[:alnum:][:punct:]]*",
+                              replacement = ""))
 ```
 
 ## Complexity of sources
@@ -183,6 +192,21 @@ single_source
 I would start with something fairly easy. It means with tf-idf
 
 ```{r complexity_sources}
+single_source_total_words <- single_source %>%
+  count(screen_name,word,sort=TRUE) %>%
+  ungroup() %>%
+  group_by(screen_name) %>%
+  summarise(total=sum(n))
+
+single_source_count <- single_source %>%
+  count(screen_name,word,sort=TRUE) %>%
+  ungroup() %>%
+  left_join(single_source_total_words)
+
+double_source_total_words <- double_source %>%
+  count(screen_name,words)
+
+
 
 
 ```
