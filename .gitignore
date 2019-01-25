@@ -1,8 +1,13 @@
+# Data
+Data/**
+*.csv
+
+# R files
+*.RData
 *.Rproj.user
 *.Rhistory
-*.RData
 *.Ruserdata
-*.csv
-*.html
 *.Rproj
-Data/**
+
+# Notebooks
+*.html
