@@ -5,8 +5,6 @@ output: html_document
 This is a demonstration on how to create a dictionary from existing data. First step is to load the packages and libraries we will need and then to read the csv file into R
 ---
 ```{r}
-install.packages("tm")
-install.packages("syuzhet")
 library(syuzhet)
 library(tm)
 library(tidyverse)
@@ -20,7 +18,7 @@ Now we go ahead and set the csv file into a data frame and the following step is
 ```{r}
 (blog.gofar  <- data.frame(blog.gofar))
 
-blogs <- separate_rows(blog.gofar, palabras, sep = "[:punct:] " )
+blogs <- separate_rows(blog.gofar, palabras, sep = "\\. " )
 
 blogs <- blogs %>%
     group_by(titulo) %>% 
@@ -90,7 +88,10 @@ escritos <- c("Despertar", "Gracias", "Noche", "Vida", "Oscuridad", "Tiempo")
 
 sentimiento_blogs <- blogs_token %>% 
   filter(titulo %in% escritos) %>%   
-  inner_join(lexico, by = c("word" = "palabra")) %>% 
+  inner_join(lexico %>% 
+               select(palabra, media_agrado) %>%
+               distinct(palabra, .keep_all = TRUE),
+             by = c("word" = "palabra")) %>% 
     group_by(titulo, linea) %>% 
     summarise(sentimiento = sum(media_agrado))
 
@@ -100,7 +101,10 @@ female_male <- c("m", "f")
 
 sentimiento_blogs_gender <- blogs_token %>% 
   filter(gender %in% female_male) %>%   
-  inner_join(lexico, by = c("word" = "palabra")) %>% 
+  inner_join(lexico %>% 
+               select(palabra, media_agrado) %>%
+               distinct(palabra, .keep_all = TRUE),
+             by = c("word" = "palabra")) %>% 
     group_by(gender, linea) %>% 
     summarise(sentimiento = sum(media_agrado))
 
@@ -288,14 +292,19 @@ counts <- blog.dtm[, ,Lexico$word]
 ```
 
 ```{r}
-any(colnames(counts) != Lexico$word)
+any(colnames(counts) %in% Lexico$word)
 ```
 
 Now counting the number of positive and negative words is easy (easy if you recognize the matrix connection).  It's a matrix multiplication; the call to `as.vector` converts the 1-column matrix into a vector.
 
 ```{r}
+Lexico <- data_frame(word = blog.dtm$dimnames$Terms) %>%
+  inner_join(Lexico) %>%
+  distinct(word, .keep_all = TRUE)
 
 rating.sentiment <- as.vector(as.matrix(blog.dtm) %*% Lexico$score)
+
+as.matrix(blog.dtm) %>% rowSums()
 
 ```
 
@@ -312,7 +321,7 @@ hist(rating.sentiment)
 Are these sentiments related to the number of friends each blogger has?
 
 ```{r}
-plot(rating.sentiment, Blogs$numero.de.amigos, xlab="Sentiment", ylab="Points")
+plot(rating.sentiment, blogs$numero.de.amigos, xlab="Sentiment", ylab="Points")
 ```
  
 This is next line of code would be done if we had a large data set. This is not the case for this example so we're not going over it. 
