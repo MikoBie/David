@@ -25,7 +25,7 @@ timelines <- get_timelines(accounts %$% screen_name, n=1000)
 write_as_csv(timelines,"timelines.csv")
 ```
 
-Cleaning data from links and emojis. We do not need emojis, however if we had category like movies or entertainment we could have needed them. The problem with the way I dealt with them is that it is not very efficient, I still did not figure out how to do it better. Nevertheless I deleted translation of emojis from the code because with bigger samples it takes to much time and is kind of pointless since it does not translate all of them.
+Cleaning data from links and emojis. We do not need emojis, however if we had category like movies or entertainment we could have needed them. Anyway, the problem with the way I deal with emojis is that it is not very efficient, I still did not figure out how to do it better. Nevertheless, I deleted translation of emojis from the code because with bigger samples it takes too much time and is kind of pointless since it does not translate all of them.
 
 ```{r clean_data}
 ## Read data from data frame
@@ -66,7 +66,7 @@ timelines_count <- timelines %>%
   left_join(timelines_words)
 ```
 
-Creating dictionary is fairly easy because likewise in the class I just computed tf-idf and afterwards selected words with the highest idf. However, I started thinking now about the dictionary we created. So there are words which fall into more than one category. Maybe it would be interesting to check if people who use words which are having in that sense double meaning also are not more complex? 
+Creating dictionary is fairly easy because likewise in the class I just computed tf-idf and afterwards selected words with the highest idf. However, I started thinking now about the dictionary we created. So there are words which fall into more than one category. Maybe it would be interesting to check if people who use words which are having in that sense double meaning also are more complex? 
 
 ```{r create_dictionary}
 ## Compute tf-idf
@@ -139,6 +139,7 @@ sample_categorised %>%
 
 ```
 
+Plot the results. I decided to plot the results in a form of histogram so we can see the distribution of number of categories appearing in single tweet.
 
 ```{r aggregate}
 sample %>%

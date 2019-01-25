@@ -1,0 +1,354 @@
+---
+title: "Text as Data"
+output: html_document
+
+This is a demonstration on how to create a dictionary from existing data. First step is to load the packages and libraries we will need and then to read the csv file into R
+---
+```{r}
+install.packages("tm")
+install.packages("syuzhet")
+library(syuzhet)
+library(tm)
+library(tidyverse)
+library(tidytext)
+blog.gofar <- read_csv(file.choose())
+```
+
+Now we go ahead and set the csv file into a data frame and the following step is to create tokens out of the text so that they can be analized. 
+
+
+```{r}
+(blog.gofar  <- data.frame(blog.gofar))
+
+blogs <- separate_rows(blog.gofar, palabras, sep = "[:punct:] " )
+
+blogs <- blogs %>%
+    group_by(titulo) %>% 
+    mutate(linea = row_number()) %>% 
+    ungroup()
+
+head(blogs)
+
+```
+Now we can extract the tokens from the data set
+
+```{r}
+blogs_token <- blogs %>% 
+    unnest_tokens(word, palabras)
+
+head(blogs_token)
+```
+The next step is to remove the "stopwords" which are very frequent words that add no meaning to the text. To do this we must first load a list of stop words in the language of interest. There are dictionaries in English so you don't need to do that. Since we are doing the dictionary based on the data in Spanish we will need to do that next. 
+
+The list of stopwords we read in is based on this source http://snowball.tartarus.org/algorithms/spanish/stop.txt
+
+```{r}
+stopwords_es <- read.csv("https://bitsandbricks.github.io/data/stopwords_es.csv",
+                      stringsAsFactors = FALSE)
+
+head(stopwords_es)
+```
+The next step is then to remove the stopwords from our blogs data set. We do this with the function "anti_join"
+
+```{r}
+blogs_token <- blogs_token %>% 
+   anti_join(stopwords_es, by = c("word" = "STOPWORD"))
+```
+Now that we have taken care of the stop words we can go ahead and look at the frequency of words from our different blogs. 
+
+```{r}
+blogs_token %>% 
+    count(word, sort = TRUE)
+```
+To do sentiment analisis we are then going to use a lexicon that has already been coded in Spanish and developed by researchers at the Universidad de Buenos Aires. 
+
+This is the reference to the article 
+
+Agustín Gravano & Matías Dell’ Amerlina Ríos, “Spanish DAL: A Spanish Dictionary of Affect in Language”, Reporte Técnico, Departamento de Computación, FCEyN-UBA, Febrero 2014.
+
+The words are coded according to:
+
+agrado (agradable / neutra / desagradable)
+activación (activa / neutra / pasiva)
+imaginabilidad (fácil de imaginar / neutra / difícil de imaginar)
+
+```{r}
+lexico <- read.csv("https://bitsandbricks.github.io/data/sdal.csv", 
+                   stringsAsFactors = FALSE)
+
+head(lexico)
+
+```
+Now we can compare the sentiment in these blogs and get an idea of how the sentiment changes doing it line by line. Lets say we wanted to compare between a blog by title. We can also compare and group by gender. 
+
+What we are measuring in this example is the level of agrado, how positive or negative a line is. A higher number means a positive rating while lower is negative sentiment. First we need to create a vector with the titles, or gender. 
+
+Then to assign each sentiment a line from the blogs we join it with the dicctionary, which automatically associates each word with the value of the sentiment. Finally we get the sum of the values to obtain a global sentiment for each line. 
+
+```{r}
+escritos <- c("Despertar", "Gracias", "Noche", "Vida", "Oscuridad", "Tiempo")
+
+sentimiento_blogs <- blogs_token %>% 
+  filter(titulo %in% escritos) %>%   
+  inner_join(lexico, by = c("word" = "palabra")) %>% 
+    group_by(titulo, linea) %>% 
+    summarise(sentimiento = sum(media_agrado))
+
+#looking at gender differences in blog sentiment
+
+female_male <- c("m", "f")
+
+sentimiento_blogs_gender <- blogs_token %>% 
+  filter(gender %in% female_male) %>%   
+  inner_join(lexico, by = c("word" = "palabra")) %>% 
+    group_by(gender, linea) %>% 
+    summarise(sentimiento = sum(media_agrado))
+
+```
+Now we can graph and see how the sentiment changes line by line in the different blogs. 
+
+```{r}
+ggplot(sentimiento_blogs) +
+  geom_bar(aes(linea, sentimiento, fill = sentimiento),
+           stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ titulo, ncol = 2, scales = "free_x") +
+    scale_fill_distiller(type = "div")
+```
+Here we can see that the most positive is reached in line 2 and 10 for Despertar. For Gracias we have that line 12 and 20 is the most negative. We can now go and see each of these lines of text and see the content. 
+
+```{r}
+blogs %>% 
+    filter(titulo == "Despertar", linea == 2 | linea == 10) %>% 
+    select(palabras)
+
+blogs %>% 
+    filter(titulo == "Gracias", linea == 12 | linea == 20) %>% 
+    select(palabras)
+
+blogs %>% 
+    filter(titulo == "Tiempo", linea == 7 | linea == 8 | linea == 15 | linea == 19 | linea == 23) %>% 
+    select(palabras)
+```
+
+Now lets graph the gender differences in sentiment 
+
+```{r}
+ggplot(sentimiento_blogs_gender) +
+  geom_bar(aes(linea, sentimiento, fill = sentimiento),
+           stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ gender, ncol = 2, scales = "free_x") +
+    scale_fill_distiller(type = "div")
+```
+Now lets check out the lines for males and females that show the highest sentiment. For males line 16 has the most positive and for females line 19 and 20 have the most negative
+
+
+```{r}
+
+blogs %>% 
+    filter(gender == "f", linea == 19 | linea == 20) %>% 
+    select(palabras)
+
+blogs %>% 
+    filter(gender == "m", linea == 16) %>% 
+    select(palabras)
+
+```
+Say now we want to see the relationship between how many people live in their household and the sentiment of their blogs. First we must create a Document Term Matrix that will be literally a "bag of words". This will have only the words without the stopwords. Before we had analyzed the text by lines that we had separated from the blog, now we are going to do text analysis using word by word. The first step is to create a corpus with the words that we have already done as tokens.  
+```{r}
+BlogCorpus <- Corpus(VectorSource(blogs_token$word))
+
+```
+To see the text itself, use the inspect command.
+
+```{r}
+inspect(BlogCorpus[[1]])
+
+```
+Now we can do the Document Term Matrix from the corpus. Each of the 662 rows represents a document, and each of the 465 columns identifies a word type. Because most of the matrix entries are zeros, it is held in “sparse” format. (Notice that you cannot recover the source corpus from the document term matrix. This matrix represents each document as a “bag of words”.)
+
+```{r}
+dtm <- DocumentTermMatrix(BlogCorpus)
+dim(dtm)
+
+dtm
+```
+It is now simple to use matrix functions from R to find the number of words in each document and the number of times each type appears (albeit at the cost of converting the sparse matrix into a dense matrix in order to use `rowSums` and `colSums`.).  
+
+```{r}
+ni <- rowSums(as.matrix(dtm))  # tokens in each document
+mj <- colSums(as.matrix(dtm))  # columns are named by the word types; frequency of each
+
+word.types <- names(mj)   # for convenience and clarity
+```
+Check a few of the terms to make sure that the data appear okay.  If you don't spend time getting the data ready, you will find lots of issues.
+
+```{r}
+j <- which.max(str_length(names(mj)))
+j
+names(mj)[j]
+
+```
+
+It is hard to imagine a distribution of counts that is more skewed than the counts 
+of the word types (left).
+```{r}
+par(mfrow=c(1,2))
+  hist(mj, breaks=50, main="Counts of Word Types")
+  hist(ni, breaks=50, main="Words per Document")
+```
+
+
+Even after taking logs, the counts remain skewed!  This is common in text.  "Tokens are common, but types are rare."
+
+```{r}
+hist(log(mj), breaks=50, main="Counts of Word Types")
+```
+
+The frequency counts in `mj` are named and in alphabetical order.  We can use these names to produce a  bar graph *of the most common words* with `ggplot`.  Stopwords have already been left out.
+
+```{r}
+Freq <- data_frame(type = names(mj), count = mj)     # ggplot and dplyr want data frames
+
+Freq %>%
+    top_n(25, count)                         %>%
+    mutate(type=reorder(type,count))         %>%     # rather than alphabetical order
+    ggplot(aes(type,count)) + geom_col() + coord_flip()
+```
+This is a good chance to check whether the frequencies of the word types matches a Zipf distribution commonly associated with text.
+
+A Zipf distribution is characterized by a power law:  the frequency of word types is inversely proportional to  rank, $f_k \propto 1/k$.  Said differently, the frequency of the second most common word is half that of the most common, the frequency of the third is one-third the most common, etc.  A little algebra shows that for this to occur, then $\log p_k \approx b_0 - \log k$.  That is, a plot of the log of the frequencies should be linear in the log of the rank $k$, with slope near -1.
+
+```{r}
+Freq %>% 
+    arrange(desc(count))                   %>%   # decreasing by count
+    mutate(rank=row_number())              %>%   # add row number
+    ggplot(aes(x=log(rank), y=log(count))) + 
+    geom_point() +
+    geom_smooth(method='lm', se=FALSE) +
+    geom_abline(slope=-1, intercept=11, color='red')
+```
+The least squares slope (commented out or shown in blue) is steeper, being dominated by the many less common words.  You can mitigate that effect by weighting the regression by the counts.
+
+```{r}
+Temp <- Freq %>%  mutate(rank=row_number())
+lm(log(count) ~ log(rank), data=Temp, weights=sqrt(count))
+```
+I'll do the sentiment analysis of the blogs using the NRC dictionary in Spanish.We are only for this purpose going to use the negative and positive words. We can actually look at other sentiments that NRC has such as joy, trust, anticipation, fear, anger, disgust, but I'm not quite there yet.... lol 
+
+
+```{r}
+English_lex <- get_sentiment_dictionary('nrc', language = "english")
+dim(English_lex)
+
+Lexico <- get_sentiment_dictionary('nrc', language = "spanish")
+
+
+Lexico <- filter(Lexico, sentiment %in% c("positive", 
+                             "negative"))
+
+dim(Lexico)
+
+View(Lexico)
+```
+Which of these words appear in the blog corpus?  Pick out the word types that both appear in the blog corpus *and* in the nrc dictionary. The other are not relevant for the sentiment calculations.
+
+```{r}
+keep.types <- intersect(Lexico$word, word.types)
+length(keep.types)
+View(keep.types)
+```
+`dplyr` is handy for filtering the Lexico data frame, picking the word types that meet this condition.  Also add a numeric score to simplify a later calculation and keep the positive and negative terms separated.
+ 
+```{r}
+Lexico <- Lexico %>%
+    filter(word %in% keep.types) %>%
+   mutate(pos = ifelse(sentiment=='positive',+1,0),
+           neg = ifelse(sentiment=='negative',+1,0),
+           score = pos - neg)
+dim(Lexico)           
+```
+
+Have a peek, noticing that the words are sorted alphabetically.
+
+```{r eval=FALSE}
+View(Lexico)
+```
+
+Now filter the DTM.  the `dtm` object is a matrix, so use indices. 
+
+```{r}
+blog.dtm <- dtm[,word.types %in% keep.types]
+blog.dtm
+```
+
+Get the columns lined up. We want to make sure that the columns of the DTM are align with the elements of the sentiment dictionary. (Yes, its a little tricky to manage matrices mixed with data frames, but not that hard since we have one of each.)
+
+```{r}
+counts <- blog.dtm[, ,Lexico$word]
+```
+
+```{r}
+any(colnames(counts) != Lexico$word)
+```
+
+Now counting the number of positive and negative words is easy (easy if you recognize the matrix connection).  It's a matrix multiplication; the call to `as.vector` converts the 1-column matrix into a vector.
+
+```{r}
+
+rating.sentiment <- as.vector(as.matrix(blog.dtm) %*% Lexico$score)
+
+```
+
+Since longer reviews accompany better wines, it is not too surprising that the typical net sentiment is also positive. 
+
+```{r}
+summary(rating.sentiment)
+```
+
+```{r}
+hist(rating.sentiment)
+```
+
+Are these sentiments related to the number of friends each blogger has?
+
+```{r}
+plot(rating.sentiment, Blogs$numero.de.amigos, xlab="Sentiment", ylab="Points")
+```
+ 
+This is next line of code would be done if we had a large data set. This is not the case for this example so we're not going over it. 
+Some "dithering" (adding random variation -- a bit of fuzz -- to avoid over-printing) improves the plot, but it's still overwhelmed by the volume of points.  So I just drew a subset of the points.
+
+```{r}
+dither <- function(x) return (x + rnorm(length(x),sd=0.05*sd(x, na.rm=TRUE)))
+dither(1:10)
+```
+
+```{r}
+i <- sample(1:length(rating.sentiment), 5000)
+plot(dither(rating.sentiment[i]), dither(Blog$numero.de.amigos[i]))
+```
+
+And if you make a data frame, `ggplot` is prettier still.  It's also then easy to add the regression line.
+
+```{r}
+data_frame(points = Wine$points, sentiment=rating.sentiment) %>%
+    ggplot(aes(sentiment,points)) +
+    geom_jitter(alpha=0.1) +        # alpha determines the opacity
+    geom_smooth(method='lm')
+```
+
+We would then here be able to check for the fit of the lm model 
+
+```{r}
+summary(lm(Blog$numero.de.amigos ~ rating.sentiment))
+```
+
+Who says negative words and positive words should have the same weight?
+
+```{r}
+rating.pos <- as.vector(as.matrix(blog.dtm) %*% lexico$pos)
+rating.neg <- as.vector(as.matrix(blog.dtm) %*% lexico$neg)
+
+any(rating.pos-rating.neg != rating.sentiment)   # all should match!
+```
+
